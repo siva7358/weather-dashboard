@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Puducherry Weather Dashboard</title>
+<!-- Lottie -->
+<script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
+<style>
+body {
+  margin: 0;
+  height: 100vh;
+  width: 100vw;
+  background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+  font-family: 'Segoe UI', sans-serif;
+  color: white;
+  overflow: hidden;
+}
+
+.container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 20px;
+  height: 100%;
+  width: 100%;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.card {
+  backdrop-filter: blur(15px);
+  background: rgba(255,255,255,0.08);
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  transition: all 0.4s ease;
+  padding: 20px;
+}
+
+.card:hover {
+  transform: scale(1.02);
+}
+
+.big {
+  grid-row: span 2;
+  width: 100%;
+  height: 100%;
+}
+
+h2 {
+  font-size: 16px;
+  color: #ccc;
+  margin-bottom: 10px;
+}
+
+.value {
+  font-size: 40px;
+  font-weight: bold;
+}
+
+.gauge {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: #222;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: 1s ease;
+  position: relative;
+}
+
+.gauge span {
+  position: absolute;
+  font-size: 18px;
+  text-align: center;
+}
+
+#weatherAnim {
+  width: 50%;
+  max-width: 300px;
+  height: auto;
+  transition: opacity 0.5s ease;
+  margin-top: 10px;
+}
+
+@media (min-width: 1920px) {
+  .container {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="card">
+    <h2>Visibility</h2>
+    <div class="value" id="visibility">--</div>
+  </div>
+
+  <div class="card">
+    <h2>Wind</h2>
+    <div class="gauge" id="windGauge"><span id="windText">--</span></div>
+  </div>
+
+  <div class="card big">
+    <h2>Puducherry</h2>
+    <div class="value" id="temp">--</div>
+    <div id="desc"></div>
+    <lottie-player id="weatherAnim" src="" background="transparent" speed="1" loop autoplay></lottie-player>
+  </div>
+
+  <div class="card" id="aqiCard">
+    <h2>AQI</h2>
+    <div class="gauge" id="aqiGauge"><span id="aqiText">--</span></div>
+    <div id="pm25"></div>
+    <div id="pm10"></div>
+    <div id="health" style="margin-top:10px; font-size:14px; color:#ccc;"></div>
+  </div>
+
+  <div class="card">
+    <h2>Humidity</h2>
+    <div id="humidity" class="value">--</div>
+  </div>
+
+  <div class="card">
+    <h2>Sunrise / Sunset</h2>
+    <div id="sun">--</div>
+  </div>
+</div>
+
+<script>
+const apiKey = "3e7057db50b0f5232d0d5fae6b9bec8f"; // Replace with your OpenWeather API key
+const city = "Puducherry";
+
+function setGauge(el, value, max=100) {
+  let color = "#4cd964";
+  if(value>40) color="#ffcc00";
+  if(value>60) color="#ff9f43";
+  if(value>80) color="#ff5a5f";
+  const deg = (value/max)*360;
+  el.style.background = `conic-gradient(${color} ${deg}deg, #222 ${deg}deg)`;
+}
+
+function getHealthAdvice(aqi){
+  switch(aqi){
+    case 1: return "Air quality is good. Enjoy outdoor activities.";
+    case 2: return "Air quality is fair. Sensitive people should take care.";
+    case 3: return "Moderate. Limit prolonged outdoor exertion.";
+    case 4: return "Poor. Avoid outdoor activities.";
+    case 5: return "Very Poor. Stay indoors and wear a mask.";
+    default: return "";
+  }
+}
+
+function setWeatherAnimation(weatherMain, aqi){
+  const anim = document.getElementById("weatherAnim");
+  let url="";
+  if(aqi>=4){
+    url="https://assets9.lottiefiles.com/packages/lf20_jmBauI.json"; // pollution
+  }else{
+    switch(weatherMain.toLowerCase()){
+      case "clear": url="https://assets2.lottiefiles.com/packages/lf20_Stt1Rk.json"; break;
+      case "rain":
+      case "drizzle": url="https://assets2.lottiefiles.com/packages/lf20_xlmz9xwm.json"; break;
+      case "clouds": url="https://assets2.lottiefiles.com/packages/lf20_Tg5MRG.json"; break;
+      case "thunderstorm": url="https://assets2.lottiefiles.com/packages/lf20_t24tpvcu.json"; break;
+      default: url="https://assets2.lottiefiles.com/packages/lf20_Stt1Rk.json";
+    }
+  }
+  anim.setAttribute("src", url);
+}
+
+async function getWeather(){
+  try {
+    const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${city}&units=metric&appid=${apiKey}`);
+    const data = await res.json();
+  
+    const temp = Math.round(data.main.temp);
+    const humidity = data.main.humidity;
+    const wind = Math.round(data.wind.speed);
+    const visibility = data.visibility/1000;
+  
+    document.getElementById("temp").innerText = temp+"°C";
+    document.getElementById("desc").innerText = data.weather[0].description;
+    document.getElementById("humidity").innerText = humidity+"%";
+    document.getElementById("windText").innerText = wind;
+    document.getElementById("visibility").innerText = visibility+" km";
+    setGauge(document.getElementById("windGauge"), wind, 50);
+  
+    const lat = data.coord.lat;
+    const lon = data.coord.lon;
+
+    // AQI API
+    const aqiRes = await fetch(`https://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lon}&appid=${apiKey}`);
+    const aqiData = await aqiRes.json();
+    const aqi = aqiData.list[0].main.aqi;
+    const pm25 = aqiData.list[0].components.pm2_5;
+    const pm10 = aqiData.list[0].components.pm10;
+    const aqiPercent = (aqi/5)*100;
+
+    document.getElementById("aqiText").innerText = "AQI "+aqi;
+    document.getElementById("pm25").innerText = "PM2.5: "+pm25.toFixed(1);
+    document.getElementById("pm10").innerText = "PM10: "+pm10.toFixed(1);
+    document.getElementById("health").innerText = getHealthAdvice(aqi);
+    setGauge(document.getElementById("aqiGauge"), aqiPercent, 100);
+
+    const sunrise = new Date(data.sys.sunrise*1000).toLocaleTimeString();
+    const sunset = new Date(data.sys.sunset*1000).toLocaleTimeString();
+    document.getElementById("sun").innerText = sunrise+" / "+sunset;
+
+    setWeatherAnimation(data.weather[0].main, aqi);
+  } catch(e){
+    console.error("Error fetching weather:", e);
+  }
+}
+
+setInterval(getWeather, 60000); // refresh every minute
+getWeather();
+</script>
+
+</body>
+</html>
